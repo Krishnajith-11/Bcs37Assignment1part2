@@ -1,54 +1,55 @@
 from fastapi import FastAPI, HTTPException
 from app.feature_engineering import extract_features
 from app.ml_model import predict
-from app.models import Customer
-
-import time
-import psutil
-import os
+from app.data_loader import load_data
 
 app = FastAPI(title="Churn Prediction ML Service")
 
-# -----------------------------
-# Health Check
-# -----------------------------
+# Load sample customers (optional endpoint use)
+try:
+    customers_data = load_data()
+except Exception:
+    customers_data = []
+
 @app.get("/")
 def home():
-    return {"message": "ML Pipeline Churn Prediction Service Running"}
+    return {"message": "ML-based Churn Prediction Service Running"}
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
-# -----------------------------
-# 🔥 MAIN ENDPOINT
-# -----------------------------
+# 🔥 MAIN ENDPOINT (ML-based)
 @app.post("/predict-risk")
-def predict_risk(customer: Customer):
+def predict_risk(customer: dict):
     try:
-        # ⏱️ Start latency timer
-        start_time = time.time()
-
         # Step 1: Feature extraction
-        features = extract_features(customer.dict())
+        features = extract_features(customer)
 
-        # Step 2: Prediction
+        # Step 2: ML prediction
         risk = predict(features)
-
-        # ⏱️ End latency timer
-        latency = time.time() - start_time
-
-        # 🧠 Memory usage
-        process = psutil.Process(os.getpid())
-        memory = process.memory_info().rss / (1024 * 1024)  # MB
 
         return {
             "risk": risk,
-            "monitoring": {
-                "latency_ms": round(latency * 1000, 2),
-                "memory_mb": round(memory, 2)
+            "features_used": {
+                "freq_7d": features[0],
+                "freq_30d": features[1],
+                "freq_90d": features[2],
+                "complaint_count": features[3],
+                "avg_gap": features[4],
+                "charge_diff": features[5]
             }
         }
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# 📊 Optional: Get sample customers
+@app.get("/customers")
+def get_customers():
+    if not customers_data:
+        return {"message": "No data available. Run preprocessing first."}
+    return customers_data[:10]
+
+
+# ❤️ Health check (useful for Kubernetes)
+@app.get("/health")
+def health():
+    return {"status": "ok"}
