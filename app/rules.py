@@ -1,25 +1,22 @@
 from datetime import datetime, timedelta
 
-def calculate_risk(data):
-    tickets = data["tickets"]
-    now = datetime.now()
+def calculate_risk(customer):
+    complaints = sum(1 for t in customer["tickets"] if t["type"] == "complaint")
+    charge_diff = customer["monthly_charges"] - customer["previous_month_charges"]
+    contract = customer["contract_type"]
 
-    recent_tickets = [
-        t for t in tickets
-        if datetime.fromisoformat(t["date"]) > now - timedelta(days=30)
-    ]
-
-    # Rule 1
-    if len(recent_tickets) > 5:
+    # 🔥 HIGH RISK CONDITIONS
+    if complaints >= 5:
         return "HIGH"
 
-    # Rule 2
-    if (data["monthly_charges"] > data["previous_month_charges"]) and len(tickets) >= 3:
-        return "MEDIUM"
+    if contract == "Month-to-Month" and complaints >= 3:
+        return "HIGH"
 
-    # Rule 3
-    if data["contract_type"] == "Month-to-Month":
-        if any(t["type"] == "complaint" for t in tickets):
-            return "HIGH"
+    if charge_diff > 20:
+        return "HIGH"
+
+    # MEDIUM
+    if complaints >= 2:
+        return "MEDIUM"
 
     return "LOW"
